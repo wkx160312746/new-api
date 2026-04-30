@@ -59,6 +59,9 @@ var defaultModelRatio = map[string]float64{
 	"gpt-4.1-nano":                     0.05, // $0.1 / 1M tokens
 	"gpt-4.1-nano-2025-04-14":          0.05, // $0.1 / 1M tokens
 	"gpt-image-1":                      2.5,  // $5 / 1M tokens
+	"gpt-image-1-mini":                 1.0,  // $2 / 1M tokens
+	"gpt-image-1.5":                    2.5,  // $5 / 1M tokens
+	"gpt-image-2":                      2.5,  // $5 / 1M tokens
 	"o1":                               7.5,  // $15 / 1M tokens
 	"o1-2024-12-17":                    7.5,  // $15 / 1M tokens
 	"o1-preview":                       7.5,  // $15 / 1M tokens
@@ -98,6 +101,21 @@ var defaultModelRatio = map[string]float64{
 	"gpt-5-mini-2025-08-07":            0.125,
 	"gpt-5-nano":                       0.025,
 	"gpt-5-nano-2025-08-07":            0.025,
+	"gpt-5.2":                          0.875,
+	"gpt-5.2-2025-12-11":               0.875,
+	"gpt-5.2-chat-latest":              0.875,
+	"gpt-5.2-pro":                      10.5,
+	"gpt-5.2-pro-2025-12-11":           10.5,
+	"gpt-5.2-codex":                    0.875,
+	"gpt-5.3-chat-latest":              0.875,
+	"gpt-5.3-codex":                    0.875,
+	"gpt-5.3-codex-spark":              0.875,
+	"gpt-5.4":                          1.25,
+	"gpt-5.4-2026-03-05":               1.25,
+	"gpt-5.4-mini":                     0.375,
+	"gpt-5.4-pro":                      15.0,
+	"gpt-5.4-pro-2026-03-05":           15.0,
+	"gpt-5.5":                          2.5,
 	//"gpt-3.5-turbo-0301":           0.75, //deprecated
 	"gpt-3.5-turbo":          0.25,
 	"gpt-3.5-turbo-0613":     0.75,
@@ -333,10 +351,13 @@ var modelRatioMap = types.NewRWMap[string, float64]()
 var completionRatioMap = types.NewRWMap[string, float64]()
 
 var defaultCompletionRatio = map[string]float64{
-	"gpt-4-gizmo-*":  2,
-	"gpt-4o-gizmo-*": 3,
-	"gpt-4-all":      2,
-	"gpt-image-1":    8,
+	"gpt-4-gizmo-*":     2,
+	"gpt-4o-gizmo-*":    3,
+	"gpt-4-all":         2,
+	"gpt-image-1":       8,
+	"gpt-image-1-mini":  4,
+	"gpt-image-1.5":     6.4,
+	"gpt-image-2":       6,
 }
 
 // InitRatioSettings initializes all model related settings maps
@@ -659,7 +680,10 @@ func ModelRatio2JSONString() string {
 }
 
 var defaultImageRatio = map[string]float64{
-	"gpt-image-1": 2,
+	"gpt-image-1":      2,
+	"gpt-image-1-mini": 1.25,
+	"gpt-image-1.5":    1.6,
+	"gpt-image-2":      1.6,
 }
 var imageRatioMap = types.NewRWMap[string, float64]()
 var audioRatioMap = types.NewRWMap[string, float64]()
