@@ -176,9 +176,18 @@ type modelListGroups struct {
 }
 
 func getModelListGroups(c *gin.Context) (modelListGroups, error) {
+	return resolveModelListGroups(c, true)
+}
+
+func resolveModelListGroups(c *gin.Context, requireUserGroup bool) (modelListGroups, error) {
 	tokenGroup := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
 	userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 	if userGroup == "" && (tokenGroup == "" || tokenGroup == "auto") {
+		if !requireUserGroup {
+			return modelListGroups{
+				tokenGroup: tokenGroup,
+			}, nil
+		}
 		var err error
 		userGroup, err = model.GetUserGroup(c.GetInt("id"), false)
 		if err != nil {
@@ -187,6 +196,11 @@ func getModelListGroups(c *gin.Context) (modelListGroups, error) {
 	}
 
 	if tokenGroup == "auto" {
+		if userGroup == "" {
+			return modelListGroups{
+				tokenGroup: tokenGroup,
+			}, nil
+		}
 		return modelListGroups{
 			userGroup:   userGroup,
 			tokenGroup:  tokenGroup,
@@ -198,10 +212,14 @@ func getModelListGroups(c *gin.Context) (modelListGroups, error) {
 	if tokenGroup != "" {
 		group = tokenGroup
 	}
+	ownerGroups := make([]string, 0, 1)
+	if group != "" {
+		ownerGroups = append(ownerGroups, group)
+	}
 	return modelListGroups{
 		userGroup:   userGroup,
 		tokenGroup:  tokenGroup,
-		ownerGroups: []string{group},
+		ownerGroups: ownerGroups,
 	}, nil
 }
 
@@ -218,7 +236,8 @@ func ListModels(c *gin.Context, modelType int) {
 	}
 
 	userModelNames := make([]string, 0)
-	groups, err := getModelListGroups(c)
+	modelLimitEnable := common.GetContextKeyBool(c, constant.ContextKeyTokenModelLimitEnabled)
+	groups, err := resolveModelListGroups(c, !modelLimitEnable)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -227,7 +246,6 @@ func ListModels(c *gin.Context, modelType int) {
 		return
 	}
 	ownerGroups := groups.ownerGroups
-	modelLimitEnable := common.GetContextKeyBool(c, constant.ContextKeyTokenModelLimitEnabled)
 	if modelLimitEnable {
 		s, ok := common.GetContextKey(c, constant.ContextKeyTokenModelLimit)
 		var tokenModelLimit map[string]bool
@@ -245,6 +263,13 @@ func ListModels(c *gin.Context, modelType int) {
 			userModelNames = append(userModelNames, allowModel)
 		}
 	} else {
+		if len(ownerGroups) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "get user group failed",
+			})
+			return
+		}
 		var models []string
 		if groups.tokenGroup == "auto" {
 			for _, autoGroup := range ownerGroups {
