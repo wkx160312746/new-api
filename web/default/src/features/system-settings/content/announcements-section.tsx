@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import { useEffect, useMemo, useState } from 'react'
 import * as z from 'zod'
 import { useForm } from 'react-hook-form'
@@ -19,14 +37,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   Form,
   FormControl,
   FormDescription,
@@ -39,11 +49,11 @@ import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import {
   Table,
   TableBody,
@@ -54,7 +64,9 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { DateTimePicker } from '@/components/datetime-picker'
+import { Dialog } from '@/components/dialog'
 import { StatusBadge } from '@/components/status-badge'
+import { SettingsSwitchField } from '../components/settings-form-layout'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 
@@ -85,6 +97,8 @@ const announcementSchema = z.object({
 })
 
 type AnnouncementFormValues = z.infer<typeof announcementSchema>
+
+const ANNOUNCEMENT_FORM_ID = 'announcement-form'
 
 const typeOptions = [
   {
@@ -300,10 +314,7 @@ export function AnnouncementsSection({
   }
 
   return (
-    <SettingsSection
-      title={t('Announcements')}
-      description={t('Broadcast short system notices on the dashboard')}
-    >
+    <SettingsSection title={t('Announcements')}>
       <div className='space-y-4'>
         <div className='flex flex-wrap items-center justify-between gap-2'>
           <div className='flex flex-wrap items-center gap-2'>
@@ -331,12 +342,12 @@ export function AnnouncementsSection({
               {updateOption.isPending ? t('Saving...') : t('Save Settings')}
             </Button>
           </div>
-          <div className='flex items-center gap-2'>
-            <span className='text-muted-foreground text-sm'>
-              {t('Enabled')}
-            </span>
-            <Switch checked={isEnabled} onCheckedChange={handleToggleEnabled} />
-          </div>
+          <SettingsSwitchField
+            checked={isEnabled}
+            onCheckedChange={handleToggleEnabled}
+            label={t('Enabled')}
+            className='border-b-0 py-0'
+          />
         </div>
 
         <div className='rounded-md border'>
@@ -444,84 +455,117 @@ export function AnnouncementsSection({
         </div>
       </div>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className='max-w-2xl'>
-          <DialogHeader>
-            <DialogTitle>
-              {editingAnnouncement
-                ? t('Edit Announcement')
-                : t('Add Announcement')}
-            </DialogTitle>
-            <DialogDescription>
-              {t('Create or update system announcements for the dashboard')}
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmitForm)}
-              className='space-y-4'
+      <Dialog
+        open={showDialog}
+        onOpenChange={setShowDialog}
+        title={
+          editingAnnouncement ? t('Edit Announcement') : t('Add Announcement')
+        }
+        description={t(
+          'Create or update system announcements for the dashboard'
+        )}
+        contentClassName='max-w-2xl'
+        contentHeight='auto'
+        bodyClassName='space-y-4'
+        footer={
+          <>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setShowDialog(false)}
             >
-              <FormField
-                control={form.control}
-                name='content'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Content')}</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder={t(
-                          'Enter announcement content (supports Markdown/HTML)'
-                        )}
-                        rows={4}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t('Maximum 500 characters. Supports Markdown and HTML.')}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='publishDate'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Publish Date')}</FormLabel>
-                    <FormControl>
-                      <DateTimePicker
-                        value={field.value ? new Date(field.value) : undefined}
-                        onChange={(date) =>
-                          field.onChange(date ? date.toISOString() : '')
-                        }
-                        placeholder={t('Select publish date')}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t(
-                        'Date and time when this announcement should be displayed'
+              {t('Cancel')}
+            </Button>
+            <Button type='submit' form={ANNOUNCEMENT_FORM_ID}>
+              {editingAnnouncement ? t('Update') : t('Add')}
+            </Button>
+          </>
+        }
+      >
+        <Form {...form}>
+          <form
+            id={ANNOUNCEMENT_FORM_ID}
+            onSubmit={form.handleSubmit(handleSubmitForm)}
+            className='space-y-4'
+          >
+            <FormField
+              control={form.control}
+              name='content'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Content')}</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder={t(
+                        'Enter announcement content (supports Markdown/HTML)'
                       )}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='type'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Type')}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={t('Select announcement type')}
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
+                      rows={4}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Maximum 500 characters. Supports Markdown and HTML.')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='publishDate'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Publish Date')}</FormLabel>
+                  <FormControl>
+                    <DateTimePicker
+                      value={field.value ? new Date(field.value) : undefined}
+                      onChange={(date) =>
+                        field.onChange(date ? date.toISOString() : '')
+                      }
+                      placeholder={t('Select publish date')}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Date and time when this announcement should be displayed'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='type'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Type')}</FormLabel>
+                  <Select
+                    items={[
+                      ...typeOptions.map((option) => ({
+                        value: option.value,
+                        label: (
+                          <div className='flex items-center gap-2'>
+                            <div
+                              className={`h-3 w-3 rounded-full ${option.color}`}
+                            />
+                            {option.label}
+                          </div>
+                        ),
+                      })),
+                    ]}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={t('Select announcement type')}
+                        />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
                         {typeOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             <div className='flex items-center gap-2'>
@@ -532,48 +576,36 @@ export function AnnouncementsSection({
                             </div>
                           </SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name='extra'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('Extra Notes (Optional)')}</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder={t('Additional information')}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {t(
-                        'Optional supplementary information (max 100 characters)'
-                      )}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button
-                  type='button'
-                  variant='outline'
-                  onClick={() => setShowDialog(false)}
-                >
-                  {t('Cancel')}
-                </Button>
-                <Button type='submit'>
-                  {editingAnnouncement ? t('Update') : t('Add')}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='extra'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Extra Notes (Optional)')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Additional information')}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Optional supplementary information (max 100 characters)'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
       </Dialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

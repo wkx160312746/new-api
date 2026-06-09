@@ -1,19 +1,32 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { useForm } from 'react-hook-form'
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { useEffect, useState } from 'react'
+import { useForm, type SubmitErrorHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import {
-  ChevronDown,
-  KeyRound,
-  Settings2,
-  WalletCards,
-  type LucideIcon,
-} from 'lucide-react'
+import { ChevronDown, KeyRound, Settings2, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { getUserModels, getUserGroups } from '@/lib/api'
 import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
 import { cn } from '@/lib/utils'
+import { useStatus } from '@/hooks/use-status'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -42,13 +55,22 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { DateTimePicker } from '@/components/datetime-picker'
+import {
+  SideDrawerSection,
+  SideDrawerSectionHeader,
+  sideDrawerContentClassName,
+  sideDrawerFooterClassName,
+  sideDrawerFormClassName,
+  sideDrawerHeaderClassName,
+  sideDrawerSwitchItemClassName,
+} from '@/components/drawer-layout'
 import { MultiSelect } from '@/components/multi-select'
 import { createApiKey, updateApiKey, getApiKey } from '../api'
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants'
 import {
-  apiKeyFormSchema,
+  getApiKeyFormSchema,
   type ApiKeyFormValues,
-  API_KEY_FORM_DEFAULT_VALUES,
+  getApiKeyFormDefaultValues,
   transformFormDataToPayload,
   transformApiKeyToFormDefaults,
 } from '../lib'
@@ -63,48 +85,20 @@ type ApiKeyMutateDrawerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   currentRow?: ApiKey
-  side?: 'left' | 'right'
-}
-
-type ApiKeyFormSectionProps = {
-  title: string
-  description: string
-  icon: LucideIcon
-  children: ReactNode
-}
-
-function ApiKeyFormSection(props: ApiKeyFormSectionProps) {
-  const Icon = props.icon
-
-  return (
-    <section className='bg-card rounded-lg border'>
-      <div className='flex items-center gap-3 border-b px-4 py-3'>
-        <div className='bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg border'>
-          <Icon className='size-5' />
-        </div>
-        <div className='min-w-0'>
-          <h3 className='text-sm font-medium leading-none'>{props.title}</h3>
-          <p className='text-muted-foreground mt-1 text-xs'>
-            {props.description}
-          </p>
-        </div>
-      </div>
-      <div className='space-y-4 p-4'>{props.children}</div>
-    </section>
-  )
 }
 
 export function ApiKeysMutateDrawer({
   open,
   onOpenChange,
   currentRow,
-  side = 'right',
 }: ApiKeyMutateDrawerProps) {
   const { t } = useTranslation()
   const isUpdate = !!currentRow
   const { triggerRefresh } = useApiKeys()
+  const { status } = useStatus()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const defaultUseAutoGroup = status?.default_use_auto_group === true
 
   // Fetch models
   const { data: modelsData } = useQuery({
@@ -130,35 +124,44 @@ export function ApiKeysMutateDrawer({
       ratio: info.ratio,
     })
   )
-
-  // Add auto group if configured
-  if (!groups.some((g) => g.value === 'auto')) {
-    groups.unshift({
-      value: 'auto',
-      label: 'auto',
-      desc: t('Auto (Circuit Breaker)'),
-    })
-  }
+  const backendHasAuto = groups.some((g) => g.value === 'auto')
+  const schema = getApiKeyFormSchema(t)
 
   const form = useForm<ApiKeyFormValues>({
-    resolver: zodResolver(apiKeyFormSchema),
-    defaultValues: API_KEY_FORM_DEFAULT_VALUES,
+    resolver: zodResolver(schema),
+    defaultValues: getApiKeyFormDefaultValues(defaultUseAutoGroup),
   })
 
   // Load existing data when updating
   useEffect(() => {
     if (open && isUpdate && currentRow) {
-      // For update, fetch fresh data
       getApiKey(currentRow.id).then((result) => {
         if (result.success && result.data) {
           form.reset(transformApiKeyToFormDefaults(result.data))
         }
       })
     } else if (open && !isUpdate) {
-      // For create, reset to defaults
-      form.reset(API_KEY_FORM_DEFAULT_VALUES)
+      form.reset(
+        getApiKeyFormDefaultValues(defaultUseAutoGroup && backendHasAuto)
+      )
     }
-  }, [open, isUpdate, currentRow, form])
+  }, [open, isUpdate, currentRow, form, defaultUseAutoGroup, backendHasAuto])
+
+  // Correct group after groups load: if the form value is not in available groups, fall back
+  useEffect(() => {
+    if (groups.length === 0) return
+    const currentGroup = form.getValues('group')
+    if (currentGroup && !groups.some((g) => g.value === currentGroup)) {
+      const fallback =
+        groups.find((g) => g.value === 'default')?.value ??
+        groups[0]?.value ??
+        ''
+      form.setValue('group', fallback)
+      if (currentGroup === 'auto') {
+        form.setValue('cross_group_retry', false)
+      }
+    }
+  }, [groups, form])
 
   const onSubmit = async (data: ApiKeyFormValues) => {
     setIsSubmitting(true)
@@ -215,6 +218,10 @@ export function ApiKeysMutateDrawer({
     }
   }
 
+  const onInvalid: SubmitErrorHandler<ApiKeyFormValues> = () => {
+    toast.error(t('Please fix the highlighted fields before saving'))
+  }
+
   const handleSetExpiry = (months: number, days: number, hours: number) => {
     if (months === 0 && days === 0 && hours === 0) {
       form.setValue('expired_time', undefined)
@@ -250,31 +257,30 @@ export function ApiKeysMutateDrawer({
       }}
     >
       <SheetContent
-        side={side}
-        className='bg-background flex w-full gap-0 overflow-hidden p-0 sm:max-w-[620px]'
+        className={sideDrawerContentClassName('max-w-none sm:!max-w-[620px]')}
       >
-        <SheetHeader className='bg-background border-b px-5 py-4 text-start'>
-          <SheetTitle className='text-lg'>
+        <SheetHeader className={sideDrawerHeaderClassName()}>
+          <SheetTitle>
             {isUpdate ? t('Update API Key') : t('Create API Key')}
           </SheetTitle>
           <SheetDescription>
             {isUpdate
               ? t('Update the API key by providing necessary info.')
-              : t('Add a new API key by providing necessary info.')}{' '}
-            {t("Click save when you're done.")}
+              : t('Add a new API key by providing necessary info.')}
           </SheetDescription>
         </SheetHeader>
         <Form {...form}>
           <form
             id='api-key-form'
-            onSubmit={form.handleSubmit(onSubmit)}
-            className='flex-1 space-y-4 overflow-y-auto px-4 py-4'
+            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+            className={sideDrawerFormClassName('gap-5')}
           >
-            <ApiKeyFormSection
-              title={t('Basic Information')}
-              description={t('Set API key basic information')}
-              icon={KeyRound}
-            >
+            <SideDrawerSection>
+              <SideDrawerSectionHeader
+                title={t('Basic Information')}
+                description={t('Set API key basic information')}
+                icon={<KeyRound className='size-4' />}
+              />
               <FormField
                 control={form.control}
                 name='name'
@@ -282,10 +288,7 @@ export function ApiKeysMutateDrawer({
                   <FormItem>
                     <FormLabel>{t('Name')}</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder={t('Enter a name')}
-                      />
+                      <Input {...field} placeholder={t('Enter a name')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -316,12 +319,12 @@ export function ApiKeysMutateDrawer({
                   control={form.control}
                   name='cross_group_retry'
                   render={({ field }) => (
-                    <FormItem className='flex min-h-20 flex-row items-center justify-between gap-4 rounded-lg border px-4 py-3'>
-                      <div className='space-y-0.5'>
+                    <FormItem className={sideDrawerSwitchItemClassName()}>
+                      <div className='flex flex-col gap-0.5'>
                         <FormLabel className='text-sm'>
                           {t('Cross-group retry')}
                         </FormLabel>
-                        <FormDescription className='text-xs'>
+                        <FormDescription className='line-clamp-2 text-xs sm:line-clamp-none'>
                           {t(
                             'When enabled, if channels in the current group fail, it will try channels in the next group in order.'
                           )}
@@ -350,7 +353,7 @@ export function ApiKeysMutateDrawer({
                           value={field.value}
                           onChange={field.onChange}
                           placeholder={t('Never expires')}
-                          className='min-w-0'
+                          className='min-w-0 [&_input[type=time]]:w-24 sm:[&_input[type=time]]:w-32'
                         />
                       </FormControl>
                       <div className='grid grid-cols-4 gap-2 sm:flex'>
@@ -358,7 +361,7 @@ export function ApiKeysMutateDrawer({
                           type='button'
                           variant='outline'
                           size='sm'
-                          className='px-3'
+                          className='px-2 text-xs sm:px-3 sm:text-sm'
                           onClick={() => handleSetExpiry(0, 0, 0)}
                         >
                           {t('Never')}
@@ -367,7 +370,7 @@ export function ApiKeysMutateDrawer({
                           type='button'
                           variant='outline'
                           size='sm'
-                          className='px-3'
+                          className='px-2 text-xs sm:px-3 sm:text-sm'
                           onClick={() => handleSetExpiry(1, 0, 0)}
                         >
                           {t('1 Month')}
@@ -376,7 +379,7 @@ export function ApiKeysMutateDrawer({
                           type='button'
                           variant='outline'
                           size='sm'
-                          className='px-3'
+                          className='px-2 text-xs sm:px-3 sm:text-sm'
                           onClick={() => handleSetExpiry(0, 1, 0)}
                         >
                           {t('1 Day')}
@@ -385,7 +388,7 @@ export function ApiKeysMutateDrawer({
                           type='button'
                           variant='outline'
                           size='sm'
-                          className='px-3'
+                          className='px-2 text-xs sm:px-3 sm:text-sm'
                           onClick={() => handleSetExpiry(0, 0, 1)}
                         >
                           {t('1 Hour')}
@@ -425,13 +428,14 @@ export function ApiKeysMutateDrawer({
                   )}
                 />
               )}
-            </ApiKeyFormSection>
+            </SideDrawerSection>
 
-            <ApiKeyFormSection
-              title={t('Quota Settings')}
-              description={t('Set quota amount and limits')}
-              icon={WalletCards}
-            >
+            <SideDrawerSection>
+              <SideDrawerSectionHeader
+                title={t('Quota Settings')}
+                description={t('Set quota amount and limits')}
+                icon={<WalletCards className='size-4' />}
+              />
               {!unlimitedQuota && (
                 <FormField
                   control={form.control}
@@ -467,8 +471,8 @@ export function ApiKeysMutateDrawer({
                 control={form.control}
                 name='unlimited_quota'
                 render={({ field }) => (
-                  <FormItem className='flex min-h-20 flex-row items-center justify-between gap-4 rounded-lg border px-4 py-3'>
-                    <div className='space-y-0.5'>
+                  <FormItem className={sideDrawerSwitchItemClassName()}>
+                    <div className='flex flex-col gap-0.5'>
                       <FormLabel className='text-sm'>
                         {t('Unlimited Quota')}
                       </FormLabel>
@@ -485,36 +489,33 @@ export function ApiKeysMutateDrawer({
                   </FormItem>
                 )}
               />
-            </ApiKeyFormSection>
+            </SideDrawerSection>
 
             <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-              <section className='bg-card rounded-lg border'>
-                <CollapsibleTrigger asChild>
-                  <button
-                    type='button'
-                    className='hover:bg-muted/50 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors'
-                  >
-                    <div className='bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg border'>
-                      <Settings2 className='size-5' />
-                    </div>
-                    <div className='min-w-0 flex-1'>
-                      <h3 className='text-sm font-medium leading-none'>
-                        {t('Advanced Settings')}
-                      </h3>
-                      <p className='text-muted-foreground mt-1 text-xs'>
-                        {t('Set API key access restrictions')}
-                      </p>
-                    </div>
-                    <ChevronDown
-                      className={cn(
-                        'text-muted-foreground size-4 shrink-0 transition-transform',
-                        advancedOpen && 'rotate-180'
-                      )}
+              <SideDrawerSection>
+                <CollapsibleTrigger
+                  render={
+                    <button
+                      type='button'
+                      className='hover:bg-muted/40 flex w-full items-center gap-3 rounded-md py-1.5 text-left transition-colors'
                     />
-                  </button>
+                  }
+                >
+                  <SideDrawerSectionHeader
+                    className='flex-1'
+                    title={t('Advanced Settings')}
+                    description={t('Set API key access restrictions')}
+                    icon={<Settings2 className='size-4' />}
+                  />
+                  <ChevronDown
+                    className={cn(
+                      'text-muted-foreground size-4 shrink-0 transition-transform',
+                      advancedOpen && 'rotate-180'
+                    )}
+                  />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className='space-y-4 border-t p-4'>
+                  <div className='flex flex-col gap-4 pt-2'>
                     <FormField
                       control={form.control}
                       name='model_limits'
@@ -571,15 +572,22 @@ export function ApiKeysMutateDrawer({
                     />
                   </div>
                 </CollapsibleContent>
-              </section>
+              </SideDrawerSection>
             </Collapsible>
           </form>
         </Form>
-        <SheetFooter className='bg-background gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end'>
-          <SheetClose asChild>
-            <Button variant='outline'>{t('Close')}</Button>
+        <SheetFooter className={sideDrawerFooterClassName()}>
+          <SheetClose
+            render={<Button variant='outline' className='w-full sm:w-auto' />}
+          >
+            {t('Close')}
           </SheetClose>
-          <Button form='api-key-form' type='submit' disabled={isSubmitting}>
+          <Button
+            type='button'
+            onClick={form.handleSubmit(onSubmit, onInvalid)}
+            disabled={isSubmitting}
+            className='w-full sm:w-auto'
+          >
             {isSubmitting ? t('Saving...') : t('Save changes')}
           </Button>
         </SheetFooter>

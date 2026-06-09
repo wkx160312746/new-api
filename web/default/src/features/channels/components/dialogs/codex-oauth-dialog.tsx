@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
 import { useEffect, useMemo, useState } from 'react'
 import { ExternalLink, Copy, Check, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -6,15 +24,8 @@ import { tryPrettyJson } from '@/lib/utils'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Dialog } from '@/components/dialog'
 import { completeCodexOAuth, startCodexOAuth } from '../../api'
 
 type CodexOAuthDialogProps = {
@@ -111,78 +122,18 @@ export function CodexOAuthDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='sm:max-w-2xl'>
-        <DialogHeader>
-          <DialogTitle>{t('Codex Authorization')}</DialogTitle>
-          <DialogDescription>
-            {t(
-              'Generate a Codex OAuth credential and paste it into the channel key field.'
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className='space-y-4'>
-          <Alert>
-            <AlertDescription>
-              {t(
-                '1) Click "Open authorization page" and complete login. 2) Your browser may redirect to localhost (it is OK if the page does not load). 3) Copy the full URL from the address bar and paste it below. 4) Click "Generate credential".'
-              )}
-            </AlertDescription>
-          </Alert>
-
-          <div className='flex flex-wrap gap-2'>
-            <Button onClick={handleStart} disabled={state.isStarting}>
-              {state.isStarting ? (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              ) : (
-                <ExternalLink className='mr-2 h-4 w-4' />
-              )}
-              {t('Open authorization page')}
-            </Button>
-
-            <Button
-              type='button'
-              variant='outline'
-              disabled={!canCopyAuthorizeUrl}
-              onClick={async () => {
-                if (!state.authorizeUrl) return
-                await copyToClipboard(state.authorizeUrl)
-              }}
-              aria-label={t('Copy authorization link')}
-              title={t('Copy authorization link')}
-            >
-              {copiedText === state.authorizeUrl ? (
-                <Check className='mr-2 h-4 w-4 text-green-600' />
-              ) : (
-                <Copy className='mr-2 h-4 w-4' />
-              )}
-              {t('Copy authorization link')}
-            </Button>
-          </div>
-
-          <div className='space-y-2'>
-            <div className='text-sm font-medium'>{t('Callback URL')}</div>
-            <Input
-              value={state.callbackUrl}
-              onChange={(e) =>
-                setState((prev) => ({ ...prev, callbackUrl: e.target.value }))
-              }
-              placeholder={t(
-                'Paste the full callback URL (includes code & state)'
-              )}
-              autoComplete='off'
-              spellCheck={false}
-            />
-            <div className='text-muted-foreground text-xs'>
-              {t(
-                'Tip: The generated key is a JSON credential including access_token / refresh_token / account_id.'
-              )}
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('Codex Authorization')}
+      description={t(
+        'Generate a Codex OAuth credential and paste it into the channel key field.'
+      )}
+      contentClassName='sm:max-w-2xl'
+      contentHeight='auto'
+      bodyClassName='space-y-4'
+      footer={
+        <>
           <Button
             type='button'
             variant='outline'
@@ -197,8 +148,68 @@ export function CodexOAuthDialog({
             )}
             {state.isCompleting ? t('Generating...') : t('Generate credential')}
           </Button>
-        </DialogFooter>
-      </DialogContent>
+        </>
+      }
+    >
+      <div className='space-y-4'>
+        <Alert>
+          <AlertDescription>
+            {t(
+              '1) Click "Open authorization page" and complete login. 2) Your browser may redirect to localhost (it is OK if the page does not load). 3) Copy the full URL from the address bar and paste it below. 4) Click "Generate credential".'
+            )}
+          </AlertDescription>
+        </Alert>
+
+        <div className='flex flex-wrap gap-2'>
+          <Button onClick={handleStart} disabled={state.isStarting}>
+            {state.isStarting ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <ExternalLink className='mr-2 h-4 w-4' />
+            )}
+            {t('Open authorization page')}
+          </Button>
+
+          <Button
+            type='button'
+            variant='outline'
+            disabled={!canCopyAuthorizeUrl}
+            onClick={async () => {
+              if (!state.authorizeUrl) return
+              await copyToClipboard(state.authorizeUrl)
+            }}
+            aria-label={t('Copy authorization link')}
+            title={t('Copy authorization link')}
+          >
+            {copiedText === state.authorizeUrl ? (
+              <Check className='mr-2 h-4 w-4 text-green-600' />
+            ) : (
+              <Copy className='mr-2 h-4 w-4' />
+            )}
+            {t('Copy authorization link')}
+          </Button>
+        </div>
+
+        <div className='space-y-2'>
+          <div className='text-sm font-medium'>{t('Callback URL')}</div>
+          <Input
+            value={state.callbackUrl}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, callbackUrl: e.target.value }))
+            }
+            placeholder={t(
+              'Paste the full callback URL (includes code & state)'
+            )}
+            autoComplete='off'
+            spellCheck={false}
+          />
+          <div className='text-muted-foreground text-xs'>
+            {t(
+              'Tip: The generated key is a JSON credential including access_token / refresh_token / account_id.'
+            )}
+          </div>
+        </div>
+      </div>
     </Dialog>
   )
 }
