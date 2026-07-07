@@ -41,8 +41,46 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
     normalized = 'zhCN'
   }
 
-  console.log('Normalized interface language: %s -> %s', value, normalized)
   return INTERFACE_LANGUAGE_OPTIONS.some((lang) => lang.code === normalized)
     ? normalized
     : 'en'
+}
+
+const INTL_LOCALE_ALIASES: Record<string, string> = {
+  zhcn: 'zh-CN',
+  'zh-cn': 'zh-CN',
+  'zh-hans': 'zh-CN',
+  zhtw: 'zh-TW',
+  'zh-tw': 'zh-TW',
+  'zh-hk': 'zh-TW',
+  'zh-mo': 'zh-TW',
+}
+
+function canonicalizeIntlLocale(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+
+  const aliasKey = trimmed.replace(/_/g, '-').toLowerCase()
+  const candidate = INTL_LOCALE_ALIASES[aliasKey] ?? trimmed
+
+  try {
+    return Intl.getCanonicalLocales(candidate)[0]
+  } catch {
+    return undefined
+  }
+}
+
+export function toIntlLocale(
+  value?: Intl.LocalesArgument | null
+): Intl.LocalesArgument | undefined {
+  if (!value) return undefined
+
+  if (Array.isArray(value)) {
+    const locales = value
+      .map((item) => canonicalizeIntlLocale(String(item)))
+      .filter((item): item is string => !!item)
+    return locales.length > 0 ? locales : undefined
+  }
+
+  return canonicalizeIntlLocale(String(value))
 }
