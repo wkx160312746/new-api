@@ -33,11 +33,11 @@ export type InterfaceLanguageCode =
 export function normalizeInterfaceLanguage(value?: string | null): string {
   if (!value) return 'en'
 
-  var normalized = value.trim().replace(/_/g, '-').toLowerCase()
+  let normalized = value.trim().replaceAll('_', '-').toLowerCase()
   if (value === 'zh-TW' || value === 'zh-HK' || value === 'zh-MO' || value === 'zhTW') {
     normalized = 'zhTW'
   }
-  if (value === 'zh-CN' || value === 'zh-Hans' || value === "zhCN") {
+  if (value === 'zh-CN' || value === 'zh-Hans' || value === 'zhCN') {
     normalized = 'zhCN'
   }
 
@@ -68,6 +68,20 @@ function canonicalizeIntlLocale(value: string): string | undefined {
   } catch {
     return undefined
   }
+}
+
+export function convertDetectedLanguage(value: string): string {
+  const lower = value.trim().replaceAll('_', '-').toLowerCase()
+  if (!lower.startsWith('zh')) return value
+  if (
+    lower === 'zh-tw' ||
+    lower === 'zh-hk' ||
+    lower === 'zh-mo' ||
+    lower.startsWith('zh-hant')
+  ) {
+    return 'zhTW'
+  }
+  return 'zhCN'
 }
 
 export function toIntlLocale(
