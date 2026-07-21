@@ -270,19 +270,7 @@ func ListModels(c *gin.Context, modelType int) {
 			})
 			return
 		}
-		var models []string
-		if groups.tokenGroup == "auto" {
-			for _, autoGroup := range ownerGroups {
-				groupModels := model.GetGroupEnabledModels(autoGroup)
-				for _, g := range groupModels {
-					if !common.StringsContains(models, g) {
-						models = append(models, g)
-					}
-				}
-			}
-		} else {
-			models = model.GetGroupEnabledModels(ownerGroups[0])
-		}
+		models := service.GetGroupsEnabledModels(ownerGroups)
 		for _, modelName := range models {
 			if !acceptUnsetRatioModel {
 				if !helper.HasModelBillingConfig(modelName) {
